@@ -1,16 +1,36 @@
 const express = require('express');
 const mysql = require('mysql2');
+const multer = require('multer');
 
 const app = express();
 
+// ==========================
 // Middleware
+// ==========================
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
-// Set EJS as view engine
 app.set('view engine', 'ejs');
 
+// ==========================
+// Multer Configuration
+// ==========================
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'public/images');
+    },
+    filename: (req, file, cb) => {
+        cb(null, file.originalname);
+    }
+});
+
+const upload = multer({
+    storage: storage
+});
+
+// ==========================
 // MySQL Connection
+// ==========================
 const connection = mysql.createConnection({
     host: 'localhost',
     user: 'root',
@@ -18,7 +38,6 @@ const connection = mysql.createConnection({
     database: 'c237_supermarketapp'
 });
 
-// Connect to MySQL
 connection.connect((err) => {
     if (err) {
         console.error('Error connecting to MySQL:', err);
@@ -26,7 +45,6 @@ connection.connect((err) => {
     }
     console.log('Connected to MySQL database');
 });
-
 
 // ==========================
 // HOME PAGE
@@ -49,7 +67,6 @@ app.get('/', (req, res) => {
     });
 
 });
-
 
 // ==========================
 // PRODUCT DETAILS
@@ -75,7 +92,6 @@ app.get('/product/:id', (req, res) => {
 
 });
 
-
 // ==========================
 // SHOW ADD PRODUCT PAGE
 // ==========================
@@ -85,13 +101,18 @@ app.get('/addProduct', (req, res) => {
 
 });
 
-
 // ==========================
 // ADD PRODUCT
 // ==========================
-app.post('/addProduct', (req, res) => {
+app.post('/addProduct', upload.single('image'), (req, res) => {
 
-    const { name, quantity, price, image } = req.body;
+    const { name, quantity, price } = req.body;
+
+    let image = null;
+
+    if (req.file) {
+        image = req.file.filename;
+    }
 
     const sql = `
         INSERT INTO products
@@ -102,7 +123,7 @@ app.post('/addProduct', (req, res) => {
     connection.query(
         sql,
         [name, quantity, price, image],
-        (error, results) => {
+        (error) => {
 
             if (error) {
                 console.error(error);
@@ -116,9 +137,8 @@ app.post('/addProduct', (req, res) => {
 
 });
 
-
 // ==========================
-// SHOW UPDATE PAGE
+// SHOW UPDATE PRODUCT PAGE
 // ==========================
 app.get('/updateProduct/:id', (req, res) => {
 
@@ -141,15 +161,20 @@ app.get('/updateProduct/:id', (req, res) => {
 
 });
 
-
 // ==========================
 // UPDATE PRODUCT
 // ==========================
-app.post('/updateProduct/:id', (req, res) => {
+app.post('/updateProduct/:id', upload.single('image'), (req, res) => {
 
     const id = req.params.id;
 
-    const { name, quantity, price, image } = req.body;
+    const { name, quantity, price, currentImage } = req.body;
+
+    let image = currentImage;
+
+    if (req.file) {
+        image = req.file.filename;
+    }
 
     const sql = `
         UPDATE products
@@ -164,7 +189,7 @@ app.post('/updateProduct/:id', (req, res) => {
     connection.query(
         sql,
         [name, quantity, price, image, id],
-        (error, results) => {
+        (error) => {
 
             if (error) {
                 console.error(error);
@@ -178,7 +203,6 @@ app.post('/updateProduct/:id', (req, res) => {
 
 });
 
-
 // ==========================
 // DELETE PRODUCT
 // ==========================
@@ -188,7 +212,7 @@ app.get('/deleteProduct/:id', (req, res) => {
 
     const sql = 'DELETE FROM products WHERE productId = ?';
 
-    connection.query(sql, [id], (error, results) => {
+    connection.query(sql, [id], (error) => {
 
         if (error) {
             console.error(error);
@@ -201,12 +225,13 @@ app.get('/deleteProduct/:id', (req, res) => {
 
 });
 
-
 // ==========================
 // START SERVER
 // ==========================
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+
+    console.log(`Server running at http://localhost:${PORT}`);
+
 });
